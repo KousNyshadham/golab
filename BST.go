@@ -9,6 +9,13 @@ import (
 	"sync"
 )
 
+type boundedBuffer struct{
+	n int
+	head int
+	bbmutex sync.Mutex
+
+}
+
 type hashId struct{
 	hash int
 	id int
@@ -263,7 +270,8 @@ func main() {
 		}
 		//wg.Wait()
 	} else {
-			
+		for i < compWorkers:
+			go 	
 	}
 	for bruh := range globalAdjacencyMatrix {
 		fmt.Println(globalAdjacencyMatrix[bruh])
