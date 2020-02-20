@@ -14,6 +14,13 @@ type hashId struct{
 	id int
 }
 
+type cst struct{
+	x Tree 
+	y Tree
+	xin int
+	yin int
+}
+
 var dataWorkers int
 var mutex = &sync.Mutex{}
 var hashComparision int
@@ -21,6 +28,7 @@ var hashPtr *int
 var dataPtr *int
 var compPtr *int
 var h2i = make(map[int][]int)		
+var globalAdjacencyMatrix [][] bool
 
 type Tree struct{
 	root *Node
@@ -33,6 +41,64 @@ type Node struct{
 	right *Node
 }
 
+
+func in_order_channel(node *Node, ch chan int) {
+	if node != nil {
+		in_order_channel(node.left, ch)
+		ch <- node.Val
+		in_order_channel(node.right, ch)
+	}
+}
+
+func createChannel(x Tree, c chan int){
+	in_order_channel(x.root, c)
+	close(c)
+}
+
+func compare(x Tree, y Tree, xin int, yin int) {
+	xc := make(chan int)
+	yc := make(chan int)
+	go createChannel(x, xc)
+	go createChannel(y, yc)
+	for {
+		xv, okx := <- xc
+		yv, oky := <- yc
+		if !okx || !oky{
+			if(okx == oky){
+				globalAdjacencyMatrix[xin][yin] = true
+				globalAdjacencyMatrix[yin][xin] = true
+			}
+			return
+		}
+		if xv != yv {
+			return	
+		}
+	}
+}
+
+func parallelCompare(x Tree, y Tree, xin int, yin int, wg *sync.WaitGroup) {
+	xc := make(chan int)
+	yc := make(chan int)
+	go createChannel(x, xc)
+	go createChannel(y, yc)
+	for {
+		xv, okx := <- xc
+		yv, oky := <- yc
+		if !okx || !oky{
+			if(okx == oky){
+				globalAdjacencyMatrix[xin][yin] = true
+				globalAdjacencyMatrix[yin][xin] = true
+			}
+			wg.Done()
+			return
+		}
+		if xv != yv {
+			wg.Done()
+			return	
+		}
+	}
+}
+
 func in_order_traversal(node *Node, traversal* [] int){
 	if node != nil{
 		in_order_traversal(node.left, traversal)	
@@ -40,7 +106,6 @@ func in_order_traversal(node *Node, traversal* [] int){
 		in_order_traversal(node.right, traversal)
 	}
 }
-
 
 func sequentialComputeHash(tree *Tree) int{
 	hash := 1
@@ -102,7 +167,6 @@ func main() {
 	compPtr := flag.Int("comp-workers", 0, "a int")
 	inputPtr := flag.String("input", "", "a string")
 	flag.Parse()
-	fmt.Println("comp:", *compPtr)
 	content, err3 := ioutil.ReadFile(*inputPtr)
 	if err3 != nil{
 		fmt.Println(err3)
@@ -172,5 +236,36 @@ func main() {
 	if hashWorkers != 1 && *dataPtr == 1{
 		close(c)
 	}
-	fmt.Println(h2i)
+	//part 3
+	s := len(trees)
+	adjacencyMatrix := make([][] bool, s)
+	for r := range adjacencyMatrix {
+		adjacencyMatrix[r] = make([] bool, s)
+		for c := range adjacencyMatrix[r] {
+			adjacencyMatrix[r][c] = false
+		}
+	}
+	globalAdjacencyMatrix = adjacencyMatrix
+	compWorkers := * compPtr
+	if compWorkers == 1{
+		//var wg sync.WaitGroup	
+		for key := range h2i {
+			sameHashes := h2i[key]
+			for o := 0; o < len(sameHashes); o++ {
+				for i:= o; i < len(sameHashes); i++ {
+					compare(trees[sameHashes[o]], trees[sameHashes[i]], sameHashes[o], sameHashes[i])
+					/*
+					wg.Add(1)
+					go parallelCompare(trees[sameHashes[o]], trees[sameHashes[i]], sameHashes[o], sameHashes[i], &wg)
+					*/
+				}
+			}
+		}
+		//wg.Wait()
+	} else {
+
+	}
+	for bruh := range globalAdjacencyMatrix {
+		fmt.Println(globalAdjacencyMatrix[bruh])
+	}
 }
