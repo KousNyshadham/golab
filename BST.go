@@ -263,7 +263,7 @@ func main() {
 		}
 		//wg.Wait()
 	} else {
-		//buffer
+			
 	}
 	for bruh := range globalAdjacencyMatrix {
 		fmt.Println(globalAdjacencyMatrix[bruh])
