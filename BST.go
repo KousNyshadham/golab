@@ -89,7 +89,7 @@ func mapInsert(c chan hashId, raceCondition chan int, lenTree int){
 	for pair:=range c {
 		h2i[pair.hash] = append(h2i[pair.hash], pair.id)
 	}
-	raceCondition <- 1 // ensures everything is added to map before printing
+	raceCondition <- 1
 }
 
 func main() {
