@@ -85,11 +85,11 @@ func (node *Node) insert(val int){
 	}
 }
 
-func mapInsert(c chan hashId, raceCondition chan int, lenTree int){
+func mapInsert(c chan hashId, race chan int, lenTree int){
 	for pair:=range c {
 		h2i[pair.hash] = append(h2i[pair.hash], pair.id)
 	}
-	raceCondition <- 1
+	race <- 1
 }
 
 func main() {
@@ -121,9 +121,9 @@ func main() {
 	hashComparision = *hashPtr
 	dataWorkers = *dataPtr
 	c := make(chan hashId)
-	raceCondition := make(chan int)
+	race := make(chan int)
 	if hashWorkers != 1 && *dataPtr == 1 {
-		go mapInsert(c, raceCondition, len(splitTrees))
+		go mapInsert(c, race, len(splitTrees))
 	}
 	i := 0
 	for i < len(trees){
@@ -147,6 +147,6 @@ func main() {
 		}
 	}
 	close(c)
-	<-raceCondition
+	<-race
 	fmt.Println(h2i)
 }
