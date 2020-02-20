@@ -53,24 +53,25 @@ func sequentialComputeHash(tree *Tree) int{
 	return hash
 }
 
-func parallelComputeHash(trees[] Tree, l int, r int, c chan hashId){
+func parallelComputeHash(trees[] Tree, l int, r int, c chan hashId, wg *sync.WaitGroup){
 	for i:= l; i < r; i++ {
 		hash := 1
 		var inorder [] int
-		in_order_traversal(trees[l].root, &inorder)
-		for i := 0; i < len(inorder); i++ {
-			new_value := inorder[i] + 2
+		in_order_traversal(trees[i].root, &inorder)
+		for j := 0; j < len(inorder); j++ {
+			new_value := inorder[j] + 2
 			hash = (hash * new_value + new_value) % 4222234741
 		}
 		if dataWorkers == 1 {
-			treeInMap := hashId{hash, l}
+			treeInMap := hashId{hash, i}
 			c <- treeInMap
 		} else if dataWorkers == hashComparision{
 			mutex.Lock()
-			h2i[hash] = append(h2i[hash], l)
+			h2i[hash] = append(h2i[hash], i)
 			mutex.Unlock()
 		}
 	}
+	wg.Done()
 }
 
 func (node *Node) insert(val int){
@@ -93,7 +94,6 @@ func mapInsert(c chan hashId, race chan int, lenTree int){
 	for pair:=range c {
 		h2i[pair.hash] = append(h2i[pair.hash], pair.id)
 	}
-	race <- 1
 }
 
 func main() {
@@ -137,68 +137,40 @@ func main() {
 			i += 1
 		}
 	} else {
-		fmt.Println(hashWorkers);
-		fmt.Println(len(trees));
 		if hashWorkers >= len(trees){
+			var wg sync.WaitGroup	
 			for j := 0; j < hashWorkers; j++ {
+				wg.Add(1)
 				if j >= len(trees) {
-					go parallelComputeHash(trees, 1, 0,  c)
+					go parallelComputeHash(trees, 1, 0,  c, &wg)
 				} else {
-					go parallelComputeHash(trees, j, j+1, c)
+					go parallelComputeHash(trees, j, j+1, c, &wg)
 				}
 			}
+			wg.Wait()
 		} else {
 			index := 0
 			overflow := len(trees) % hashWorkers
 			perfect := int(len(trees) / hashWorkers)
+			var wg sync.WaitGroup	
 			for j:= 0; j < hashWorkers; j++ {
+				wg.Add(1)
 				if overflow > 0 {
 					oldIndex := index
 					index += (perfect + 1)
-					go parallelComputeHash(trees, oldIndex, index, c)
+					go parallelComputeHash(trees, oldIndex, index, c, &wg)
 					overflow--
 				} else {
 					oldIndex := index
-					index += index + perfect
-					go parallelComputeHash(trees, oldIndex, index, c)
+					index += perfect
+					go parallelComputeHash(trees, oldIndex, index, c, &wg)
 				}
 			}
-		}
-
-		/*
-		//var wg sync.WaitGroup	
-		for j :=0; j < hashWorkers; j++{
-			//wg.Add(1)
-			if j >= actualWorkers {
-				go parallelComputeHash(trees, 1, 0 , -1, &wg, c)
-			} else{
-				go parallelComputeHash(trees, i+j, &wg,c)
-			}
-		}
-		*/
-		//wg.Wait()
-	}
-	/*
-	for i < len(trees){
-		var leftToTraverse = len(trees)-i
-		if *hashPtr == 1 {
-		} else {
-			if leftToTraverse < hashWorkers {
-				hashWorkers = leftToTraverse
-			}
-			var wg sync.WaitGroup	
-			for j :=0; j < hashWorkers; j++{
-				wg.Add(1)
-				go parallelComputeHash(&trees[i+j], i+j, &wg,c)
-
-			}
-			i+=hashWorkers
 			wg.Wait()
 		}
 	}
-	*/
 	if hashWorkers != 1 && *dataPtr == 1{
-		<-race
+		close(c)
 	}
 	fmt.Println(h2i)
 }
