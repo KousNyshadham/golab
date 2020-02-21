@@ -9,18 +9,6 @@ import (
 	"sync"
 )
 
-type boundedBuffer struct{
-	n int
-	head int
-	bbmutex sync.Mutex
-
-}
-
-type hashId struct{
-	hash int
-	id int
-}
-
 type cst struct{
 	x Tree 
 	y Tree
@@ -28,11 +16,68 @@ type cst struct{
 	yin int
 }
 
+type boundedBuffer struct{
+	n int
+	head int
+	N int	
+	buffer[] cst	
+	// dont have to declare below?
+	bbmutex sync.Mutex
+	empty *sync.Cond
+	full *sync.Cond
+}
+
+func NewBoundedBuffer(n int, head int, N int) *boundedBuffer{
+	bb := boundedBuffer{n: n, head: head, N: N}
+	bb.empty = sync.NewCond(&bb.bbmutex)
+	bb.full = sync.NewCond(&bb.bbmutex)
+	bb.buffer = make([] cst, N)
+	return &bb
+}
+
+func (bb *boundedBuffer) get() cst{
+	var value cst
+	bb.bbmutex.Lock()
+	for bb.n == 0 {
+		bb.full.Wait()
+	}
+	value = bb.buffer[bb.head]
+	bb.head = (bb.head + 1) % bb.N;
+	bb.n = bb.n-1
+	bb.empty.Signal()
+	bb.bbmutex.Unlock()
+	return value
+}
+
+func consumeBuffer(){
+	for{
+		output := globalbb.get()
+		compare(output.x, output.y, output.xin,output.yin)
+	}
+}
+
+func (bb *boundedBuffer) producer(inputCst cst){
+	bb.bbmutex.Lock()
+	for bb.n == bb.N {
+		bb.empty.Wait()
+	}
+	bb.buffer[(bb.head+bb.n)%bb.N] = inputCst
+	bb.n = bb.n+1
+	bb.full.Signal()
+	bb.bbmutex.Unlock()
+}
+
+type hashId struct{
+	hash int
+	id int
+}
+
 var dataWorkers int
 var mutex = &sync.Mutex{}
 var hashComparision int
 var hashPtr *int
 var dataPtr *int
+var globalbb *boundedBuffer
 var compPtr *int
 var h2i = make(map[int][]int)		
 var globalAdjacencyMatrix [][] bool
@@ -40,7 +85,6 @@ var globalAdjacencyMatrix [][] bool
 type Tree struct{
 	root *Node
 }
-
 
 type Node struct{
 	Val int
@@ -270,8 +314,19 @@ func main() {
 		}
 		//wg.Wait()
 	} else {
-		for i < compWorkers:
-			go 	
+		globalbb = NewBoundedBuffer(0, 0, compWorkers)
+		for f := 0; f < compWorkers; f++ {
+			go consumeBuffer()
+		}
+		for key := range h2i{
+			sameHashes := h2i[key]
+			for o:=0; o < len(sameHashes); o++ {
+				for i:= o; i < len(sameHashes); i++{
+					sendCst := cst{trees[sameHashes[o]], trees[sameHashes[i]], sameHashes[o], sameHashes[i]}
+					globalbb.producer(sendCst)
+				}
+			}
+		}
 	}
 	for bruh := range globalAdjacencyMatrix {
 		fmt.Println(globalAdjacencyMatrix[bruh])
