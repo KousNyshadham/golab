@@ -52,6 +52,10 @@ func (bb *boundedBuffer) get() cst{
 func consumeBuffer(){
 	for{
 		output := globalbb.get()
+		if output.xin == -69 {
+			globalwgg.Done()
+			return
+		}
 		compare(output.x, output.y, output.xin,output.yin)
 	}
 }
@@ -81,6 +85,7 @@ var globalbb *boundedBuffer
 var compPtr *int
 var h2i = make(map[int][]int)		
 var globalAdjacencyMatrix [][] bool
+var globalwgg sync.WaitGroup	
 
 type Tree struct{
 	root *Node
@@ -316,6 +321,7 @@ func main() {
 	} else {
 		globalbb = NewBoundedBuffer(0, 0, compWorkers)
 		for f := 0; f < compWorkers; f++ {
+			globalwgg.Add(1)
 			go consumeBuffer()
 		}
 		for key := range h2i{
@@ -327,6 +333,12 @@ func main() {
 				}
 			}
 		}
+		//sending poisoned values to go routines waiting to receive to exit them from infite for loop and wait so print normal 
+		for f:= 0; f < compWorkers; f++ {
+			sendCst := cst{Tree{&Node{Val: -69}}, Tree{&Node{Val: -69}}, -69, -69}
+			globalbb.producer(sendCst)
+		}
+		globalwgg.Wait()
 	}
 	for bruh := range globalAdjacencyMatrix {
 		fmt.Println(globalAdjacencyMatrix[bruh])
