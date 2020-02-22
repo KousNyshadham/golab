@@ -7,6 +7,7 @@ import (
 	"strings"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type cst struct{
@@ -163,7 +164,7 @@ func in_order_traversal(node *Node, traversal* [] int){
 	}
 }
 
-func sequentialComputeHash(tree *Tree) int{
+func sequentialComputeHash(tree *Tree, id int, c chan hashId){
 	hash := 1
 	var inorder [] int
 	in_order_traversal(tree.root, &inorder)
@@ -171,7 +172,10 @@ func sequentialComputeHash(tree *Tree) int{
 		new_value := inorder[i] + 2
 		hash = (hash * new_value + new_value) % 4222234741
 	}
-	return hash
+	if dataWorkers == 1{
+		treeInMap := hashId{hash, id}
+		c <- treeInMap
+	}
 }
 
 func parallelComputeHash(trees[] Tree, l int, r int, c chan hashId, wg *sync.WaitGroup){
@@ -232,7 +236,7 @@ func main() {
 	for i := 0; i < len(splitTrees); i++ {
 		var splitTree[] string = strings.Split(splitTrees[i], " ")
 		atoiRoot, err := strconv.Atoi(splitTree[0])
-		if err != nil { fmt.Println(err) }
+		if err != nil { fmt.Println(err); continue}
 		tree := Tree{&Node{Val: atoiRoot}}
 		for j := 1; j < len(splitTree); j++ {
 			atoi, err2 := strconv.Atoi(splitTree[j])	
@@ -246,19 +250,25 @@ func main() {
 	dataWorkers = *dataPtr
 	c := make(chan hashId)
 	race := make(chan int)
-	if hashWorkers != 1 && *dataPtr == 1 {
+	if (*dataPtr == 1){
 		go mapInsert(c, race, len(splitTrees))
 	}
 	if *hashPtr == 1 {
+		start := time.Now()
 		i := 0
 		for i < len(trees){
-			hash := sequentialComputeHash(&trees[i])
-			h2i[hash] = append(h2i[hash], i)
+			sequentialComputeHash(&trees[i], i, c)
 			i += 1
+		}
+		elapsed:=time.Since(start)
+		fmt.Println("hashTime: ", elapsed)
+		if dataWorkers != 0{
+			fmt.Println("hashGroupTime: ", elapsed)
 		}
 	} else {
 		if hashWorkers >= len(trees){
 			var wg sync.WaitGroup	
+			bruh := time.Now()
 			for j := 0; j < hashWorkers; j++ {
 				wg.Add(1)
 				if j >= len(trees) {
@@ -268,11 +278,17 @@ func main() {
 				}
 			}
 			wg.Wait()
+			elapsed:=time.Since(bruh)
+			fmt.Println("hashTime: ", elapsed)
+			if dataWorkers != 0{
+				fmt.Println("hashGroupTime: ", elapsed)
+			}
 		} else {
 			index := 0
 			overflow := len(trees) % hashWorkers
 			perfect := int(len(trees) / hashWorkers)
 			var wg sync.WaitGroup	
+			bruh := time.Now()
 			for j:= 0; j < hashWorkers; j++ {
 				wg.Add(1)
 				if overflow > 0 {
@@ -287,12 +303,36 @@ func main() {
 				}
 			}
 			wg.Wait()
+			elapsed:=time.Since(bruh)
+			fmt.Println("hashTime: ", elapsed)
+			if dataWorkers != 0{
+				fmt.Println("hashGroupTime: ", elapsed)
+			}
 		}
 	}
-	if hashWorkers != 1 && *dataPtr == 1{
+	if *dataPtr == 1{
 		close(c)
 	}
+	if dataWorkers == 0 {
+		return
+	}
+	for key := range h2i {
+		sameHashes := h2i[key]
+		if len(sameHashes) == 1{
+			continue
+		}
+		//fmt.Printf("%d: ",key)
+		for bruhh := range sameHashes{
+			bruhh = bruhh
+			//fmt.Printf("%d ", sameHashes[bruhh])
+		}
+		//fmt.Println()
+	}
 	//part 3
+	compWorkers := * compPtr
+	if compWorkers == 0 {
+		return
+	}
 	s := len(trees)
 	adjacencyMatrix := make([][] bool, s)
 	for r := range adjacencyMatrix {
@@ -302,9 +342,9 @@ func main() {
 		}
 	}
 	globalAdjacencyMatrix = adjacencyMatrix
-	compWorkers := * compPtr
-	if compWorkers == 1{
+	if compWorkers == -69{
 		//var wg sync.WaitGroup	
+		start := time.Now()
 		for key := range h2i {
 			sameHashes := h2i[key]
 			for o := 0; o < len(sameHashes); o++ {
@@ -317,8 +357,11 @@ func main() {
 				}
 			}
 		}
+		elapsed := time.Since(start)
+		fmt.Println("compareTreeTime: ", elapsed)
 		//wg.Wait()
 	} else {
+		start := time.Now()
 		globalbb = NewBoundedBuffer(0, 0, compWorkers)
 		for f := 0; f < compWorkers; f++ {
 			globalwgg.Add(1)
@@ -339,8 +382,36 @@ func main() {
 			globalbb.producer(sendCst)
 		}
 		globalwgg.Wait()
+		elapsed := time.Since(start)
+		fmt.Println("compareTreeTime: ", elapsed)
 	}
-	for bruh := range globalAdjacencyMatrix {
-		fmt.Println(globalAdjacencyMatrix[bruh])
+	set := make(map[int]bool)
+	for f:=0; f < len(trees); f++ {
+		set[f] = true
+	}
+	groups := 0
+	for f:=0; f < len(trees); f++{
+		if set[f] == false{
+			continue
+		}
+		count := 0
+		for brooo := range globalAdjacencyMatrix[f] {
+			if globalAdjacencyMatrix[f][brooo] {
+				count = count + 1
+			}
+		}
+		if count <= 1{
+			continue
+		} else{
+			//fmt.Printf("group %d: ", groups)
+			for brooo := range globalAdjacencyMatrix[f] {
+				if globalAdjacencyMatrix[f][brooo] {
+					set[brooo] = false			
+					//fmt.Printf("%d ", brooo)
+				}
+			}
+			//fmt.Println()
+			groups = groups + 1
+		}
 	}
 }
