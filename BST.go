@@ -321,12 +321,12 @@ func main() {
 		if len(sameHashes) == 1{
 			continue
 		}
-		//fmt.Printf("%d: ",key)
+		fmt.Printf("%d: ",key)
 		for bruhh := range sameHashes{
 			bruhh = bruhh
-			//fmt.Printf("%d ", sameHashes[bruhh])
+			fmt.Printf("%d ", sameHashes[bruhh])
 		}
-		//fmt.Println()
+		fmt.Println()
 	}
 	//part 3
 	compWorkers := * compPtr
@@ -342,6 +342,7 @@ func main() {
 		}
 	}
 	globalAdjacencyMatrix = adjacencyMatrix
+    //sequential: no compWorkers spawned; different from one comp worker being spawned
 	if compWorkers == -69{
 		//var wg sync.WaitGroup	
 		start := time.Now()
@@ -403,14 +404,14 @@ func main() {
 		if count <= 1{
 			continue
 		} else{
-			//fmt.Printf("group %d: ", groups)
+			fmt.Printf("group %d: ", groups)
 			for brooo := range globalAdjacencyMatrix[f] {
 				if globalAdjacencyMatrix[f][brooo] {
 					set[brooo] = false			
-					//fmt.Printf("%d ", brooo)
+					fmt.Printf("%d ", brooo)
 				}
 			}
-			//fmt.Println()
+			fmt.Println()
 			groups = groups + 1
 		}
 	}
